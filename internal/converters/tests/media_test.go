@@ -37,3 +37,33 @@ func TestMediaProbesAudioMetadata(t *testing.T) {
 		t.Fatalf("expected an audio stream in metadata:\n%s", res.Markdown)
 	}
 }
+
+// Slow: downloads/loads a whisper model. Gated behind an env var so the normal
+// suite stays fast. Asserts a transcript is produced (not its exact text, which
+// varies with synthetic speech).
+func TestMediaTranscribesSpeech(t *testing.T) {
+	if os.Getenv("DISTILL_TEST_WHISPER") == "" {
+		t.Skip("set DISTILL_TEST_WHISPER=1 to run the whisper transcription test")
+	}
+	if _, err := exec.LookPath("whisper"); err != nil {
+		t.Skip("whisper not installed")
+	}
+	if _, err := exec.LookPath("espeak-ng"); err != nil {
+		t.Skip("espeak-ng not installed")
+	}
+	wav := filepath.Join(t.TempDir(), "s.wav")
+	if out, err := exec.Command("espeak-ng", "-w", wav, "Hello world this is distill").CombinedOutput(); err != nil {
+		t.Skipf("espeak-ng failed: %s", out)
+	}
+	data, err := os.ReadFile(wav)
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := (Media{}).Convert(bytes.NewReader(data), convert.StreamInfo{Extension: ".wav", Filename: "s.wav"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(res.Markdown, "## Transcript") || len(strings.TrimSpace(res.Markdown)) < 20 {
+		t.Fatalf("expected a non-empty transcript section:\n%s", res.Markdown)
+	}
+}
