@@ -18,9 +18,12 @@ go build -o distill ./cmd/distill
 distill path/to/file.csv             # Markdown to stdout
 distill path/to/file.csv -o out.md   # write to a file
 cat data.tsv | distill -x tsv        # read from stdin
+distill report.docx -json            # emit a JSON document model
+distill batch ./docs --out-dir ./md  # convert a directory tree concurrently
 ```
 
-Flags: `-o` output file · `-x` extension hint · `-m` MIME-type hint · `-c` charset hint.
+Flags: `-o` output file · `-x` extension hint · `-m` MIME-type hint · `-c` charset hint · `-json` JSON output.
+`batch` flags: `--out-dir` (required) · `--json` · `--workers`.
 
 ## Supported formats
 

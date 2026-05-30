@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/MitudruDutta/distill/internal/app"
 	"github.com/MitudruDutta/distill/internal/convert"
 	converters "github.com/MitudruDutta/distill/internal/converters/src"
 )
@@ -20,17 +23,23 @@ func main() {
 }
 
 func run(args []string, stdin io.Reader, stdout io.Writer) error {
+	if len(args) > 0 && args[0] == "batch" {
+		return runBatch(args[1:], stdout)
+	}
+	return runConvert(args, stdin, stdout)
+}
+
+func runConvert(args []string, stdin io.Reader, stdout io.Writer) error {
 	fs := flag.NewFlagSet("distill", flag.ContinueOnError)
 	out := fs.String("o", "", "output file (default: stdout)")
 	ext := fs.String("x", "", "extension hint, e.g. csv (useful for stdin)")
 	mimeHint := fs.String("m", "", "MIME type hint")
 	charset := fs.String("c", "", "charset hint, e.g. utf-8")
+	asJSON := fs.Bool("json", false, "emit a JSON document model instead of Markdown")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-
-	// Allow flags to appear after the filename (e.g. `distill file.csv -o out.md`);
-	// the flag package stops at the first positional argument otherwise.
+	// Allow flags after the filename (the flag package stops at the first positional).
 	var files []string
 	for rest := fs.Args(); len(rest) > 0; rest = fs.Args() {
 		files = append(files, rest[0])
@@ -74,9 +83,48 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if *out != "" {
-		return os.WriteFile(*out, []byte(res.Markdown+"\n"), 0o644)
+
+	output := []byte(res.Markdown)
+	if *asJSON {
+		if output, err = json.MarshalIndent(res, "", "  "); err != nil {
+			return err
+		}
 	}
-	_, err = fmt.Fprintln(stdout, res.Markdown)
+	if *out != "" {
+		return os.WriteFile(*out, append(output, '\n'), 0o644)
+	}
+	_, err = fmt.Fprintln(stdout, string(output))
 	return err
+}
+
+func runBatch(args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("distill batch", flag.ContinueOnError)
+	outDir := fs.String("out-dir", "", "output directory (required)")
+	asJSON := fs.Bool("json", false, "emit JSON sidecars instead of Markdown")
+	workers := fs.Int("workers", 0, "concurrent workers (default: NumCPU)")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	var dirs []string
+	for rest := fs.Args(); len(rest) > 0; rest = fs.Args() {
+		dirs = append(dirs, rest[0])
+		if err := fs.Parse(rest[1:]); err != nil {
+			return err
+		}
+	}
+	if len(dirs) == 0 {
+		return errors.New("batch: input directory required")
+	}
+	if *outDir == "" {
+		return errors.New("batch: --out-dir is required")
+	}
+
+	ok, bad, err := app.Batch(converters.Default(), app.BatchOptions{
+		InDir: dirs[0], OutDir: *outDir, JSON: *asJSON, Workers: *workers,
+	})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "converted %d, failed %d\n", ok, bad)
+	return nil
 }

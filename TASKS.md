@@ -136,8 +136,8 @@ Goal: convert remote documents safely; pluggable AI backends.
 
 Goal: the wedge — batch, structured output, server, agent tooling, plugins.
 
-- [ ] 7.1 `internal/app/batch.go` + `distill batch`: walk a dir tree, worker pool sized to `GOMAXPROCS`, `--out-dir` mirroring input layout, include/exclude globs, progress + aggregated error report, continue-on-error.
-- [ ] 7.2 JSON sidecar: serialize `Result` (title, headings tree, tables, detected type, source metadata); `--json` (stdout) and batch `.json` next to each `.md`.
+- [x] 7.1 `internal/app/batch.go` + `distill batch`: concurrent dir-tree walk (worker pool sized to `GOMAXPROCS`), `--out-dir` mirroring input layout, `--workers`, continue-on-error with a converted/failed summary. (include/exclude globs deferred.)
+- [x] 7.2 JSON document model: `--json` serializes `convert.Result` (markdown + title today; headings/tables as richer converters land); `batch --json` writes `.json` sidecars.
 - [ ] 7.3 `internal/app/serve.go` + `distill serve`: `POST /convert` (multipart upload + raw body), `127.0.0.1` default bind, **required auth token** for non-loopback, body-size limit, per-request timeout, `/healthz`.
 - [ ] 7.4 `distill mcp`: MCP server over stdio exposing a `convert` tool (path or bytes → Markdown/JSON).
 - [ ] 7.5 Plugin API: define a stable out-of-process plugin protocol (or registration hook); `--use-plugins`, `--list-plugins`.
@@ -179,4 +179,5 @@ Goal: shippable, cross-platform, honestly documented.
 - [x] Phase 2 — DOCX, PPTX, ODT/ODS/ODP, XLSX, image metadata, EML, ZIP/TAR, EPUB. Deferred: MSG, legacy XLS.
 - [x] Phase 3A — PDF pure-Go text extraction (default build).
 - [ ] Phase 3B / 4 / 5 — PDFium+tables, OCR, media transcription: blocked on native libs (cgo/PDFium/Tesseract/Whisper) not available in this environment.
-- [ ] **Next feasible (pure-Go): Phase 7** — batch mode, JSON sidecar, secured `serve`, MCP.
+- [~] Phase 7 — done: concurrent batch mode, JSON document model (`--json`). Remaining: secured `serve`, MCP, plugin API.
+- [ ] **Next: Phase 7 cont.** — `serve` (locked-down HTTP `POST /convert`) and `mcp`.
