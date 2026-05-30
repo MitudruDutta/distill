@@ -149,7 +149,19 @@ func reconstructPage(rects []*responses.GetPageTextStructuredRect) string {
 		sort.Slice(row, func(i, j int) bool { return row[i].left < row[j].left })
 	}
 
-	// Columns: cluster left positions.
+	asText := func() string {
+		lines := make([]string, len(rows))
+		for ri, row := range rows {
+			parts := make([]string, len(row))
+			for i, b := range row {
+				parts[i] = b.text
+			}
+			lines[ri] = strings.Join(parts, " ")
+		}
+		return strings.Join(lines, "\n")
+	}
+
+	// Candidate columns from clustered left positions.
 	lefts := make([]float64, len(boxes))
 	for i, b := range boxes {
 		lefts[i] = b.left
@@ -161,51 +173,73 @@ func reconstructPage(rects []*responses.GetPageTextStructuredRect) string {
 			cols = append(cols, x)
 		}
 	}
-	colOf := func(left float64) int {
-		best, bestD := 0, math.Abs(left-cols[0])
-		for i := 1; i < len(cols); i++ {
-			if d := math.Abs(left - cols[i]); d < bestD {
-				best, bestD = i, d
+	near := func(x float64, cs []float64) int {
+		best, bd := 0, math.Abs(x-cs[0])
+		for i := 1; i < len(cs); i++ {
+			if d := math.Abs(x - cs[i]); d < bd {
+				best, bd = i, d
 			}
 		}
 		return best
 	}
 
-	multiCol := 0
+	// A real table has FEW columns whose x-positions recur across MANY rows.
+	// Keep only columns supported by >=50% of rows (and >=3 rows); this rejects
+	// prose/resumes that merely scatter text across horizontal positions.
+	support := make([]int, len(cols))
 	for _, row := range rows {
 		seen := map[int]bool{}
 		for _, b := range row {
-			seen[colOf(b.left)] = true
+			if ci := near(b.left, cols); math.Abs(b.left-cols[ci]) <= colTol {
+				seen[ci] = true
+			}
+		}
+		for ci := range seen {
+			support[ci]++
+		}
+	}
+	minSup := (len(rows) + 1) / 2
+	if minSup < 3 {
+		minSup = 3
+	}
+	var strong []float64
+	for ci, c := range cols {
+		if support[ci] >= minSup {
+			strong = append(strong, c)
+		}
+	}
+	if len(strong) < 2 || len(strong) > 6 || len(rows) < 3 {
+		return asText()
+	}
+
+	multi := 0
+	for _, row := range rows {
+		seen := map[int]bool{}
+		for _, b := range row {
+			if ci := near(b.left, strong); math.Abs(b.left-strong[ci]) <= colTol*1.5 {
+				seen[ci] = true
+			}
 		}
 		if len(seen) >= 2 {
-			multiCol++
+			multi++
 		}
 	}
-
-	if len(cols) >= 2 && len(rows) >= 2 && float64(multiCol) >= 0.5*float64(len(rows)) {
-		grid := make([][]string, len(rows))
-		for ri, row := range rows {
-			cells := make([]string, len(cols))
-			for _, b := range row {
-				ci := colOf(b.left)
-				if cells[ci] != "" {
-					cells[ci] += " " + b.text
-				} else {
-					cells[ci] = b.text
-				}
-			}
-			grid[ri] = cells
-		}
-		return strings.TrimRight(toMarkdownTable(grid), "\n")
+	if float64(multi) < 0.7*float64(len(rows)) {
+		return asText()
 	}
 
-	lines := make([]string, len(rows))
+	grid := make([][]string, len(rows))
 	for ri, row := range rows {
-		parts := make([]string, len(row))
-		for i, b := range row {
-			parts[i] = b.text
+		cells := make([]string, len(strong))
+		for _, b := range row {
+			ci := near(b.left, strong)
+			if cells[ci] != "" {
+				cells[ci] += " " + b.text
+			} else {
+				cells[ci] = b.text
+			}
 		}
-		lines[ri] = strings.Join(parts, " ")
+		grid[ri] = cells
 	}
-	return strings.Join(lines, "\n")
+	return strings.TrimRight(toMarkdownTable(grid), "\n")
 }

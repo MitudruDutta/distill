@@ -73,3 +73,30 @@ func TestPDFiumProseIsNotMisreadAsTable(t *testing.T) {
 		t.Fatalf("prose text missing:\n%s", got)
 	}
 }
+
+// Regression: a resume-style layout (recurring left margin + scattered
+// right-aligned items that do NOT form aligned columns) must render as text,
+// not a garbage many-column table.
+func TestPDFiumScatteredLayoutIsNotATable(t *testing.T) {
+	g := fpdf.New("P", "pt", "Letter", "")
+	g.SetCompression(false)
+	g.AddPage()
+	g.SetFont("Helvetica", "", 11)
+	put := func(x, y float64, s string) { g.SetXY(x, y); g.Cell(160, 14, s) }
+	put(72, 72, "Mitudru Dutta")
+	put(400, 72, "email@example.com")
+	put(72, 96, "Experience")
+	put(72, 120, "Engineer")
+	put(430, 120, "2024-2026")
+	put(72, 144, "Built systems and shipped features")
+	put(72, 168, "Education")
+	put(72, 192, "University")
+	put(410, 192, "2020-2024")
+	got := mustConvertPDFium(t, g)
+	if strings.Contains(got, "| --- |") {
+		t.Fatalf("scattered layout misdetected as a table:\n%s", got)
+	}
+	if !strings.Contains(got, "Mitudru Dutta") {
+		t.Fatalf("text missing:\n%s", got)
+	}
+}
