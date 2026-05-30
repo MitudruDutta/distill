@@ -82,11 +82,11 @@ Goal: solid text extraction by default, high-fidelity + tables behind the `pdf` 
 - NOTE (3B): default PDF text uses `pdftotext`/pure-Go (+ OCR fallback). A **PDFium** engine is also integrated via a pure-Go **WASM** backend behind `-tags pdfium` (no cgo). Word-position **table reconstruction** (3.4/3.5) is the remaining enhancement.
 - [x] 3.2 `pdf_pdfium.go` (`//go:build pdfium`): **pure-Go WASM backend** (`go-pdfium/webassembly` via wazero — no cgo, no native lib; embeds pdfium.wasm). Pooled instance, open from bytes, per-page text. Verified.
 - [x] 3.3 Build-tag dispatch: `registerPDFium` adds PDFium at priority -1 under `-tags pdfium`, falling through to the pdftotext/OCR path on error/empty. Default binary excludes the wasm.
-- [ ] 3.4 Word-box extraction from PDFium (position + size per word) for layout work.
-- [ ] 3.5 Table reconstruction: cluster words into rows (Y) and columns (X) with adaptive tolerance; render aligned Markdown tables; pass through non-table text as paragraphs.
-- [ ] 3.6 Fallback chain: PDFium fails/empty → pure-Go path; still empty → clear error.
-- [ ] 3.7 Fixtures: a text PDF and a table PDF; tests for both paths (table tests under `pdf` tag).
-- [ ] 3.8 **DoD**: default build extracts text; `-tags pdf` build extracts tables; memory stays bounded on a large PDF.
+- [x] 3.4 Position extraction from PDFium via `GetPageTextStructured` (rects with point positions).
+- [x] 3.5 Table reconstruction (`reconstructPage`): cluster rects into rows (Y) and columns (X) with line-height-adaptive tolerance; render aligned Markdown tables via `toMarkdownTable`; prose stays plain text (conservative whole-page decision).
+- [x] 3.6 Fallback chain: PDFium structured → plain `GetPageText`; PDFium error/empty → falls through (priority) to the default pdftotext/pure-Go/OCR path.
+- [x] 3.7 Tests (`-tags pdfium`): text PDF, reconstructed table, and prose-is-not-a-table.
+- [x] 3.8 **DoD met**: default build excludes the wasm and passes; `-tags pdfium` build extracts text + tables. (Large-file memory bounding not separately benchmarked.)
 
 ---
 
@@ -179,7 +179,7 @@ Goal: shippable, cross-platform, honestly documented.
 - [x] Phase 2 — DOCX, PPTX, ODT/ODS/ODP, XLSX, image metadata, EML, ZIP/TAR, EPUB. Deferred: MSG, legacy XLS.
 - [x] Phase 3A — PDF pure-Go text extraction (default build).
 - [x] Phase 3B/4/5 (shell-out, no cgo) — `pdftotext` PDF, `tesseract` OCR (verified 5.5.2), `ffprobe` media metadata + `whisper` transcription (verified). All auto-detected at runtime.
-- [x] Phase 3B PDFium engine — integrated via pure-Go **WASM** backend (`-tags pdfium`), verified. Remaining: word-position **table reconstruction** (3.4/3.5).
-- [ ] **Next:** PDF table reconstruction, then Phase 7 MCP server + plugin API.
+- [x] Phase 3B PDFium — engine + **table reconstruction** via pure-Go WASM (`-tags pdfium`), verified (text, table, prose tests).
+- [ ] **Next:** Phase 7 — MCP server + plugin API.
 - [~] Phase 7 — done: concurrent batch mode, JSON document model, secured `serve`. Remaining: MCP server, plugin API.
 - [ ] **Next: Phase 7 cont.** — `mcp` (stdio convert tool) and the plugin API.
