@@ -1,6 +1,7 @@
 package converters
 
 import (
+	"bytes"
 	"fmt"
 	"image"
 	_ "image/gif"
@@ -12,8 +13,8 @@ import (
 	"github.com/MitudruDutta/distill/internal/convert"
 )
 
-// Image emits basic metadata (format and pixel dimensions) for common raster
-// images. It reads only the header, not the pixels.
+// Image emits format + pixel dimensions for common raster images, and appends
+// OCR text when Tesseract is available.
 type Image struct{}
 
 var imageExts = map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".gif": true}
@@ -23,7 +24,11 @@ func (Image) Accepts(info convert.StreamInfo) bool {
 }
 
 func (Image) Convert(r io.Reader, info convert.StreamInfo) (convert.Result, error) {
-	cfg, format, err := image.DecodeConfig(r)
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return convert.Result{}, err
+	}
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(data))
 	if err != nil {
 		return convert.Result{}, err
 	}
@@ -32,5 +37,10 @@ func (Image) Convert(r io.Reader, info convert.StreamInfo) (convert.Result, erro
 		name = "image"
 	}
 	md := fmt.Sprintf("**%s** — %s, %d×%d px", name, format, cfg.Width, cfg.Height)
+	if ocrAvailable() {
+		if text, e := ocrImageText(data); e == nil && text != "" {
+			md += "\n\n" + text
+		}
+	}
 	return convert.Result{Markdown: md, Title: name}, nil
 }

@@ -32,8 +32,12 @@ Flags: `-o` output file · `-x` extension hint · `-m` MIME-type hint · `-c` ch
 
 | Status | Formats |
 |--------|---------|
-| Available | plain text, CSV, TSV, JSON, YAML/TOML/INI, XML, RSS/Atom, Jupyter (`.ipynb`), HTML, DOCX, PPTX, XLSX, ODT/ODS/ODP, EML, ZIP/TAR, EPUB, PDF (text), images (metadata) |
-| Planned | MSG, legacy XLS, PDF tables & scanned/OCR, audio/video — see [`TASKS.md`](TASKS.md) |
+| Available | plain text, CSV, TSV, JSON, YAML/TOML/INI, XML, RSS/Atom, Jupyter (`.ipynb`), HTML, DOCX, PPTX, XLSX, ODT/ODS/ODP, EML, ZIP/TAR, EPUB, PDF, images, audio/video |
+| Planned | MSG, legacy XLS, PDF Markdown-table reconstruction — see [`TASKS.md`](TASKS.md) |
+
+Optional external tools, auto-detected at runtime (the build stays pure-Go): `pdftotext`
+(higher-fidelity PDF text), `tesseract` (image & scanned-PDF OCR), `ffmpeg`/`ffprobe`
+(audio/video metadata), `whisper` (transcription).
 
 ## Development
 

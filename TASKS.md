@@ -79,7 +79,7 @@ Phase 2A (text/office formats) is done; Phase 2B (EML, archives, EPUB) is next.
 Goal: solid text extraction by default, high-fidelity + tables behind the `pdf` (cgo) tag.
 
 - [x] 3.1 `pdf.go` (default, no cgo): pure-Go text via `github.com/ledongthuc/pdf` ✅ (`GetPlainText`), panic-hardened. Tested with an fpdf-generated PDF round-trip.
-- NOTE: 3.2–3.8 below are **Phase 3B (deferred)** — they require the PDFium native library + cgo, which is not available in the current build environment.
+- NOTE (3B): higher-fidelity text now uses poppler's `pdftotext -layout` when present (no cgo); scanned PDFs fall back to OCR (`pdftoppm` + `tesseract`). PDFium bindings and true Markdown **table reconstruction** remain the optional cgo route (deferred).
 - [ ] 3.2 Verify + add `github.com/klippa-app/go-pdfium` ✅; `pdf_pdfium.go` (`//go:build pdf`): init instance pool, open from bytes, extract text per page, close pages to bound memory.
 - [ ] 3.3 Build-tag dispatch: `pdf` tag overrides pure-Go converter at registration.
 - [ ] 3.4 Word-box extraction from PDFium (position + size per word) for layout work.
@@ -92,7 +92,7 @@ Goal: solid text extraction by default, high-fidelity + tables behind the `pdf` 
 
 ## Phase 4 — OCR (`ocr` tag)
 
-Goal: text from images and scanned PDFs.
+Goal: text from images and scanned PDFs. **Done (no cgo)** via a `tesseract` shell-out: images are OCR'd (`ocr.go`), scanned PDFs are rasterized with `pdftoppm` then OCR'd, and it degrades gracefully when `tesseract` is absent. Requires installing tesseract; the OCR path is not exercised in this environment.
 
 - [ ] 4.1 Verify OCR backend (🔎 `github.com/otiai10/gosseract/v2` cgo, or `tesseract` CLI shell-out); define an `OCR` interface so either backend plugs in.
 - [ ] 4.2 `image_ocr.go` (`//go:build ocr`): OCR an image → text; replaces/augments the metadata-only image converter when built with `ocr`.
@@ -105,7 +105,7 @@ Goal: text from images and scanned PDFs.
 
 ## Phase 5 — Media (`media` tag)
 
-Goal: metadata + speech transcription for audio/video.
+Goal: metadata + speech transcription for audio/video. **Done (no cgo)** via an `ffprobe` metadata block (format/duration/streams) in `media.go`, with an optional `whisper` transcript hook. ffmpeg/ffprobe verified here; whisper is gated/auto-detected.
 
 - [ ] 5.1 Verify audio-tag lib (🔎 `github.com/dhowden/tag`); `audio_meta.go`: emit metadata front-matter.
 - [ ] 5.2 Define `Transcriber` interface; implement a local backend (🔎 whisper.cpp binding) **and** a cloud backend, runtime-selectable via `--transcribe-engine`.
@@ -178,6 +178,6 @@ Goal: shippable, cross-platform, honestly documented.
 - [x] Phase 1 — text family (JSON, YAML/TOML/INI, XML, RSS/Atom, ipynb, HTML).
 - [x] Phase 2 — DOCX, PPTX, ODT/ODS/ODP, XLSX, image metadata, EML, ZIP/TAR, EPUB. Deferred: MSG, legacy XLS.
 - [x] Phase 3A — PDF pure-Go text extraction (default build).
-- [ ] Phase 3B / 4 / 5 — PDFium+tables, OCR, media transcription: blocked on native libs (cgo/PDFium/Tesseract/Whisper) not available in this environment.
+- [x] Phase 3B/4/5 (shell-out, no cgo) — `pdftotext` PDF, `tesseract` OCR (images + scanned PDF), `ffprobe` audio/video metadata + `whisper` hook. Auto-detected; tesseract/whisper not installed here. PDFium + table reconstruction (cgo) still optional/deferred.
 - [~] Phase 7 — done: concurrent batch mode, JSON document model, secured `serve`. Remaining: MCP server, plugin API.
 - [ ] **Next: Phase 7 cont.** — `mcp` (stdio convert tool) and the plugin API.
