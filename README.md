@@ -26,8 +26,8 @@ Flags: `-o` output file · `-x` extension hint · `-m` MIME-type hint · `-c` ch
 
 | Status | Formats |
 |--------|---------|
-| Available | plain text, CSV, TSV |
-| Planned | JSON, YAML/TOML/INI, XML/RSS/Atom, Jupyter, HTML, DOCX, XLSX, PPTX, ODF, EML/MSG, ZIP/TAR, EPUB, images, PDF, audio/video — see [`TASKS.md`](TASKS.md) |
+| Available | plain text, CSV, TSV, JSON, YAML/TOML/INI, XML, RSS/Atom, Jupyter (`.ipynb`), HTML |
+| Planned | DOCX, XLSX, PPTX, ODF, EML/MSG, ZIP/TAR, EPUB, images, PDF, audio/video — see [`TASKS.md`](TASKS.md) |
 
 ## Development
 
