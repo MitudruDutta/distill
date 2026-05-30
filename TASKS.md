@@ -78,7 +78,8 @@ Phase 2A (text/office formats) is done; Phase 2B (EML, archives, EPUB) is next.
 
 Goal: solid text extraction by default, high-fidelity + tables behind the `pdf` (cgo) tag.
 
-- [ ] 3.1 `pdf_purego.go` (no `pdf` tag): pure-Go text via `github.com/ledongthuc/pdf` ✅ or `rsc.io/pdf` ✅; whole-document text extraction.
+- [x] 3.1 `pdf.go` (default, no cgo): pure-Go text via `github.com/ledongthuc/pdf` ✅ (`GetPlainText`), panic-hardened. Tested with an fpdf-generated PDF round-trip.
+- NOTE: 3.2–3.8 below are **Phase 3B (deferred)** — they require the PDFium native library + cgo, which is not available in the current build environment.
 - [ ] 3.2 Verify + add `github.com/klippa-app/go-pdfium` ✅; `pdf_pdfium.go` (`//go:build pdf`): init instance pool, open from bytes, extract text per page, close pages to bound memory.
 - [ ] 3.3 Build-tag dispatch: `pdf` tag overrides pure-Go converter at registration.
 - [ ] 3.4 Word-box extraction from PDFium (position + size per word) for layout work.
@@ -176,4 +177,6 @@ Goal: shippable, cross-platform, honestly documented.
 - [x] Phase 0 — core engine + CLI + plain-text/CSV.
 - [x] Phase 1 — text family (JSON, YAML/TOML/INI, XML, RSS/Atom, ipynb, HTML).
 - [x] Phase 2 — DOCX, PPTX, ODT/ODS/ODP, XLSX, image metadata, EML, ZIP/TAR, EPUB. Deferred: MSG, legacy XLS.
-- [ ] **Next: Phase 3** — PDF (pure-Go text, then PDFium + tables behind a build tag).
+- [x] Phase 3A — PDF pure-Go text extraction (default build).
+- [ ] Phase 3B / 4 / 5 — PDFium+tables, OCR, media transcription: blocked on native libs (cgo/PDFium/Tesseract/Whisper) not available in this environment.
+- [ ] **Next feasible (pure-Go): Phase 7** — batch mode, JSON sidecar, secured `serve`, MCP.
