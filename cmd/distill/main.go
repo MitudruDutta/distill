@@ -29,6 +29,8 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			return runBatch(args[1:], stdout)
 		case "serve":
 			return runServe(args[1:], stdout)
+		case "mcp":
+			return app.MCP(converters.Default(), stdin, stdout)
 		}
 	}
 	return runConvert(args, stdin, stdout)

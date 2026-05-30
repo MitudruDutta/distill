@@ -139,7 +139,7 @@ Goal: the wedge — batch, structured output, server, agent tooling, plugins.
 - [x] 7.1 `internal/app/batch.go` + `distill batch`: concurrent dir-tree walk (worker pool sized to `GOMAXPROCS`), `--out-dir` mirroring input layout, `--workers`, continue-on-error with a converted/failed summary. (include/exclude globs deferred.)
 - [x] 7.2 JSON document model: `--json` serializes `convert.Result` (markdown + title today; headings/tables as richer converters land); `batch --json` writes `.json` sidecars.
 - [x] 7.3 `internal/app/serve.go` + `distill serve`: `POST /convert` (raw body) + `GET /healthz`; loopback-default bind, **non-loopback refused without an auth token** (Bearer / X-Auth-Token, constant-time compare), `--max-bytes` cap, read/write/idle timeouts. (multipart upload deferred.)
-- [ ] 7.4 `distill mcp`: MCP server over stdio exposing a `convert` tool (path or bytes → Markdown/JSON).
+- [x] 7.4 `distill mcp`: stdio MCP server (line-delimited JSON-RPC 2.0) exposing a `convert` tool (path → markdown/json). Implements initialize, tools/list, tools/call, notifications/initialized, ping; pure-Go, no external MCP dep. Unit-tested with -race + live JSON-RPC handshake smoke test.
 - [ ] 7.5 Plugin API: define a stable out-of-process plugin protocol (or registration hook); `--use-plugins`, `--list-plugins`.
 - [ ] 7.6 Tests: batch over a temp tree, sidecar schema, serve handler (auth + limits), mcp tool call.
 - [ ] 7.7 **DoD**: `distill batch ./in --out-dir ./out --json` converts a tree concurrently; `serve` rejects unauthenticated non-loopback requests.
@@ -181,5 +181,5 @@ Goal: shippable, cross-platform, honestly documented.
 - [x] Phase 3B/4/5 (shell-out, no cgo) — `pdftotext` PDF, `tesseract` OCR (verified 5.5.2), `ffprobe` media metadata + `whisper` transcription (verified). All auto-detected at runtime.
 - [x] Phase 3B PDFium — engine + **table reconstruction** via pure-Go WASM (`-tags pdfium`), verified (text, table, prose tests).
 - [ ] **Next:** Phase 7 — MCP server + plugin API.
-- [~] Phase 7 — done: concurrent batch mode, JSON document model, secured `serve`. Remaining: MCP server, plugin API.
-- [ ] **Next: Phase 7 cont.** — `mcp` (stdio convert tool) and the plugin API.
+- [~] Phase 7 — done: concurrent batch mode, JSON document model, secured `serve`, MCP server. Remaining: plugin API.
+- [ ] **Next: Phase 7 cont.** — plugin API; then Phase 8 packaging (release matrix, CI).
