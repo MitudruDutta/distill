@@ -79,7 +79,7 @@ func (Feed) Convert(r io.Reader, _ convert.StreamInfo) (convert.Result, error) {
 
 func writeFeedHeader(b *strings.Builder, title string) {
 	if t := strings.TrimSpace(title); t != "" {
-		b.WriteString("# " + t + "\n\n")
+		b.WriteString("# ");b.WriteString(t);b.WriteString("\n\n")
 	}
 }
 
@@ -89,12 +89,12 @@ func writeFeedItem(b *strings.Builder, title, link, date string) {
 		title = "(untitled)"
 	}
 	if link = strings.TrimSpace(link); link != "" {
-		b.WriteString("- [" + title + "](" + link + ")")
+		b.WriteString("- [");b.WriteString(title);b.WriteString("](");b.WriteString(link);b.WriteString(")")
 	} else {
-		b.WriteString("- " + title)
+		b.WriteString("- ");b.WriteString(title)
 	}
 	if d := strings.TrimSpace(date); d != "" {
-		b.WriteString(" — " + d)
+		b.WriteString(" — ");b.WriteString(d)
 	}
 	b.WriteByte('\n')
 }

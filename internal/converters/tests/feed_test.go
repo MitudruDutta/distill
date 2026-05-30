@@ -1,6 +1,7 @@
-package converters
+package converters_test
 
 import (
+	. "github.com/MitudruDutta/distill/internal/converters/src"
 	"strings"
 	"testing"
 
@@ -37,7 +38,7 @@ func TestFeedAtomRendersTitleAndEntries(t *testing.T) {
 }
 
 func TestFeedRejectsNonFeedXML(t *testing.T) {
-	if _, err := (Feed{}).Convert(strings.NewReader(`<note><to>x</to></note>`), convert.StreamInfo{Extension: ".xml"}); err != errNotFeed {
-		t.Fatalf("want errNotFeed, got %v", err)
+	if _, err := (Feed{}).Convert(strings.NewReader(`<note><to>x</to></note>`), convert.StreamInfo{Extension: ".xml"}); err == nil {
+		t.Fatal("want an error for non-feed XML, got nil")
 	}
 }

@@ -1,6 +1,7 @@
-package converters
+package converters_test
 
 import (
+	. "github.com/MitudruDutta/distill/internal/converters/src"
 	"strings"
 	"testing"
 

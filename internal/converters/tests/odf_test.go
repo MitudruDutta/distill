@@ -1,7 +1,8 @@
-package converters
+package converters_test
 
 import (
 	"bytes"
+	. "github.com/MitudruDutta/distill/internal/converters/src"
 	"testing"
 
 	"github.com/MitudruDutta/distill/internal/convert"

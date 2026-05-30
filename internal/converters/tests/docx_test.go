@@ -1,8 +1,9 @@
-package converters
+package converters_test
 
 import (
 	"archive/zip"
 	"bytes"
+	. "github.com/MitudruDutta/distill/internal/converters/src"
 	"testing"
 
 	"github.com/MitudruDutta/distill/internal/convert"

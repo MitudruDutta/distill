@@ -46,10 +46,10 @@ func (Ipynb) Convert(r io.Reader, _ convert.StreamInfo) (convert.Result, error) 
 		src := joinLines(c.Source)
 		switch c.CellType {
 		case "markdown":
-			b.WriteString(src + "\n\n")
+			b.WriteString(src);b.WriteString("\n\n")
 		case "code":
 			if strings.TrimSpace(src) != "" {
-				b.WriteString("```" + lang + "\n" + src + "\n```\n\n")
+				b.WriteString("```");b.WriteString(lang);b.WriteString("\n");b.WriteString(src);b.WriteString("\n```\n\n")
 			}
 			for _, o := range c.Outputs {
 				txt := joinLines(o.Text)
@@ -57,7 +57,7 @@ func (Ipynb) Convert(r io.Reader, _ convert.StreamInfo) (convert.Result, error) 
 					txt = joinLines(o.Data["text/plain"])
 				}
 				if strings.TrimSpace(txt) != "" {
-					b.WriteString("```\n" + txt + "\n```\n\n")
+					b.WriteString("```\n");b.WriteString(txt);b.WriteString("\n```\n\n")
 				}
 			}
 		}

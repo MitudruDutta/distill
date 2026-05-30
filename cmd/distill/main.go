@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/MitudruDutta/distill/internal/convert"
-	"github.com/MitudruDutta/distill/internal/converters"
+	converters "github.com/MitudruDutta/distill/internal/converters/src"
 )
 
 func main() {

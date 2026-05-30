@@ -36,6 +36,14 @@ go vet ./...
 go test ./... -race
 ```
 
+Converter source lives in `internal/converters/src/`; its black-box tests live in
+`internal/converters/tests/`. Because Go ties test files to their package directory, the
+tests exercise the exported API. To measure source coverage from them:
+
+```bash
+go test ./internal/converters/tests/ -coverpkg=./internal/converters/src
+```
+
 ## License
 
 Not yet chosen. Add a `LICENSE` (e.g. MIT or Apache-2.0) before publishing.
