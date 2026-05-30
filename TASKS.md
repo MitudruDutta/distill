@@ -64,10 +64,10 @@ Phase 2A (text/office formats) is done; Phase 2B (EML, archives, EPUB) is next.
 - [x] 2.3 `pptx.go`: iterate `ppt/slides/slideN.xml` in slide order; emit `## Slide N` + text. Title-vs-body distinction deferred.
 - [x] 2.4 `xlsx.go` via `github.com/xuri/excelize/v2` ✅: each sheet → `## <name>` + Markdown table. NOTE: `.xlsx` only — legacy binary `.xls` deferred (excelize does not read BIFF).
 - [x] 2.5 `odf.go`: ODT/ODS/ODP via `content.xml` — `text:h` and `text:p` text extracted. Tables flattened (deferred).
-- [ ] 2.6 `eml.go`: `net/mail` headers + multipart walk; HTML parts via the HTML pipeline. (Phase 2B)
+- [x] 2.6 `eml.go`: headers + MIME multipart (prefers text/plain, HTML parts converted); base64/quoted-printable decoded.
 - [ ] 2.7 MSG (OLE/CFB) — deferred (needs `mscfb` + MAPI property parsing).
-- [ ] 2.8 `archive.go`: ZIP/TAR — recurse through the engine with zip-bomb/entry/depth caps. (Phase 2B)
-- [ ] 2.9 `epub.go`: read OPF spine order; convert each XHTML via the HTML pipeline. (Phase 2B)
+- [x] 2.8 `archive.go`: ZIP/TAR entries converted via the registry with entry-count/byte caps; nested archives skipped (recursion bound); no disk writes (zip-slip N/A).
+- [x] 2.9 `epub.go`: resolve OPF via container.xml; convert spine XHTML in order through the HTML pipeline.
 - [x] 2.10 `image.go`: format + pixel dimensions via stdlib `image.DecodeConfig` (png/jpeg/gif). NOTE: full EXIF table deferred (kept zero-dep, no `goexif`).
 - [x] 2.11 Usage-named tests with programmatically-built fixtures (`docx_test.go`, `pptx_test.go`, `odf_test.go`, `xlsx_test.go`, `image_test.go`).
 - [x] 2.12 **DoD met (Phase 2A)**: `go vet`/`build`/`test -race` green; converters coverage 87.6%.
@@ -175,5 +175,5 @@ Goal: shippable, cross-platform, honestly documented.
 - [x] Task breakdown authored (`TASKS.md`).
 - [x] Phase 0 — core engine + CLI + plain-text/CSV.
 - [x] Phase 1 — text family (JSON, YAML/TOML/INI, XML, RSS/Atom, ipynb, HTML).
-- [~] Phase 2 — done: DOCX, PPTX, ODT/ODS/ODP, XLSX, image metadata. Deferred: MSG, legacy XLS.
-- [ ] **Next: Phase 2B** — EML, ZIP/TAR archives, EPUB.
+- [x] Phase 2 — DOCX, PPTX, ODT/ODS/ODP, XLSX, image metadata, EML, ZIP/TAR, EPUB. Deferred: MSG, legacy XLS.
+- [ ] **Next: Phase 3** — PDF (pure-Go text, then PDFium + tables behind a build tag).

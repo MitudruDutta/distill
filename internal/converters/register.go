@@ -28,6 +28,9 @@ func Default() *convert.Registry {
 	reg.Register(ODF{}, 0)
 	reg.Register(XLSX{}, 0)
 	reg.Register(Image{}, 0)
+	reg.Register(EML{}, 0)
+	reg.Register(EPUB{}, 0)
+	reg.Register(Archive{Reg: reg}, 0)
 
 	return reg
 }
