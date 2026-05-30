@@ -92,7 +92,7 @@ Goal: solid text extraction by default, high-fidelity + tables behind the `pdf` 
 
 ## Phase 4 — OCR (`ocr` tag)
 
-Goal: text from images and scanned PDFs. **Done (no cgo)** via a `tesseract` shell-out: images are OCR'd (`ocr.go`), scanned PDFs are rasterized with `pdftoppm` then OCR'd, and it degrades gracefully when `tesseract` is absent. Requires installing tesseract; the OCR path is not exercised in this environment.
+Goal: text from images and scanned PDFs. **Done (no cgo)** via a `tesseract` shell-out: images are OCR'd (`ocr.go`), scanned PDFs are rasterized with `pdftoppm` then OCR'd, and it degrades gracefully when `tesseract` is absent. **Verified end-to-end with tesseract 5.5.2** (image OCR + scanned-PDF OCR tests).
 
 - [ ] 4.1 Verify OCR backend (🔎 `github.com/otiai10/gosseract/v2` cgo, or `tesseract` CLI shell-out); define an `OCR` interface so either backend plugs in.
 - [ ] 4.2 `image_ocr.go` (`//go:build ocr`): OCR an image → text; replaces/augments the metadata-only image converter when built with `ocr`.
@@ -178,6 +178,6 @@ Goal: shippable, cross-platform, honestly documented.
 - [x] Phase 1 — text family (JSON, YAML/TOML/INI, XML, RSS/Atom, ipynb, HTML).
 - [x] Phase 2 — DOCX, PPTX, ODT/ODS/ODP, XLSX, image metadata, EML, ZIP/TAR, EPUB. Deferred: MSG, legacy XLS.
 - [x] Phase 3A — PDF pure-Go text extraction (default build).
-- [x] Phase 3B/4/5 (shell-out, no cgo) — `pdftotext` PDF, `tesseract` OCR (images + scanned PDF), `ffprobe` audio/video metadata + `whisper` hook. Auto-detected; tesseract/whisper not installed here. PDFium + table reconstruction (cgo) still optional/deferred.
+- [x] Phase 3B/4/5 (shell-out, no cgo) — `pdftotext` PDF, `tesseract` OCR (images + scanned PDF, **verified** with 5.5.2), `ffprobe` audio/video metadata + `whisper` hook. Auto-detected; whisper absent here. PDFium + table reconstruction (cgo) still optional/deferred.
 - [~] Phase 7 — done: concurrent batch mode, JSON document model, secured `serve`. Remaining: MCP server, plugin API.
 - [ ] **Next: Phase 7 cont.** — `mcp` (stdio convert tool) and the plugin API.

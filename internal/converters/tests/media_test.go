@@ -37,13 +37,3 @@ func TestMediaProbesAudioMetadata(t *testing.T) {
 		t.Fatalf("expected an audio stream in metadata:\n%s", res.Markdown)
 	}
 }
-
-func TestImageOCRWhenTesseractPresent(t *testing.T) {
-	if _, err := exec.LookPath("tesseract"); err != nil {
-		t.Skip("tesseract not installed; OCR path not exercised here")
-	}
-	// When tesseract is available, Image conversion should still succeed and
-	// include the metadata header (OCR text is appended when detected).
-	png := filepath.Join(t.TempDir(), "x.png")
-	_ = png // OCR-on-rendered-text fixtures require font rendering; covered manually.
-}
