@@ -23,8 +23,13 @@ func main() {
 }
 
 func run(args []string, stdin io.Reader, stdout io.Writer) error {
-	if len(args) > 0 && args[0] == "batch" {
-		return runBatch(args[1:], stdout)
+	if len(args) > 0 {
+		switch args[0] {
+		case "batch":
+			return runBatch(args[1:], stdout)
+		case "serve":
+			return runServe(args[1:], stdout)
+		}
 	}
 	return runConvert(args, stdin, stdout)
 }
@@ -127,4 +132,20 @@ func runBatch(args []string, stdout io.Writer) error {
 	}
 	fmt.Fprintf(stdout, "converted %d, failed %d\n", ok, bad)
 	return nil
+}
+
+func runServe(args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("distill serve", flag.ContinueOnError)
+	addr := fs.String("addr", "127.0.0.1:8080", "listen address (host:port)")
+	token := fs.String("token", os.Getenv("DISTILL_TOKEN"), "auth token; required for non-loopback binds")
+	maxBytes := fs.Int64("max-bytes", 32<<20, "maximum request body size in bytes")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	srv, err := app.NewServer(converters.Default(), app.ServeOptions{Addr: *addr, Token: *token, MaxBytes: *maxBytes})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "distill serve listening on %s\n", *addr)
+	return srv.ListenAndServe()
 }
