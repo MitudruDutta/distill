@@ -28,7 +28,7 @@ func TestNormalizeWhitespaceAndBlankLines(t *testing.T) {
 		{"trailing spaces and tabs", "a   \nb\t\n", "a\nb"},
 		{"crlf to lf", "a\r\nb\r\n", "a\nb"},
 		{"collapse many blank lines", "a\n\n\n\n\nb", "a\n\nb"},
-		{"strip leading and trailing blanks", "\n\n  a  \n\n", "a"},
+		{"strip leading and trailing blank lines, keep content indent", "\n\n  a  \n\n", "  a"},
 		{"preserve a single blank line", "a\n\nb", "a\n\nb"},
 		{"empty stays empty", "", ""},
 	}
@@ -36,6 +36,42 @@ func TestNormalizeWhitespaceAndBlankLines(t *testing.T) {
 		if got := normalize(c.in); got != c.want {
 			t.Errorf("%s: normalize(%q) = %q, want %q", c.name, c.in, got, c.want)
 		}
+	}
+}
+
+func TestNormalizeRewritesBulletGlyphsToDash(t *testing.T) {
+	cases := []struct{ name, in, want string }{
+		{"unicode bullet", "• Hello", "- Hello"},
+		{"black square", "▪ Foo", "- Foo"},
+		{"indent preserved for nesting", "  • Indented", "  - Indented"},
+		{"private use area (resume bullet)", "\uF0B7 Pua bullet", "- Pua bullet"},
+		{"no space after glyph stays as-is", "•Hello", "•Hello"},
+		{"glyph not at start stays as-is", "Hello • world", "Hello • world"},
+	}
+	for _, c := range cases {
+		if got := normalize(c.in); got != c.want {
+			t.Errorf("%s: normalize(%q) = %q, want %q", c.name, c.in, got, c.want)
+		}
+	}
+}
+
+func TestNormalizeFoldsExoticSpacesAndDropsInvisibles(t *testing.T) {
+	in := "Hello\u00A0world\u200B test\u3000end"
+	want := "Hello world test end"
+	if got := normalize(in); got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestNormalizePreservesContentInCodeFences(t *testing.T) {
+	// Bullet glyphs and NBSP inside a fenced code block must be left intact.
+	in := "before\n\n```python\n• keep me\nthen\u00A0space\n```\n\n• after"
+	got := normalize(in)
+	if !strings.Contains(got, "• keep me") || !strings.Contains(got, "then\u00A0space") {
+		t.Fatalf("fence content was modified:\n%s", got)
+	}
+	if !strings.Contains(got, "- after") {
+		t.Fatalf("post-fence bullet not normalized:\n%s", got)
 	}
 }
 

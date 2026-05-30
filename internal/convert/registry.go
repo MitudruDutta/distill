@@ -80,13 +80,73 @@ func (reg *Registry) Convert(r io.Reader, guesses []StreamInfo) (Result, error) 
 
 var blankLines = regexp.MustCompile(`\n{3,}`)
 
-// normalize trims trailing whitespace per line, collapses 3+ blank lines into
-// one, and strips leading/trailing whitespace.
+// bulletPrefix matches a leading bullet-like glyph (with optional indent) so we
+// can rewrite it as "- ". Covers common ASCII/Unicode bullets plus the Private
+// Use Area, which most resume/CV PDFs use as their bullet codepoint.
+var bulletPrefix = regexp.MustCompile(`^(\s*)[\x{2022}\x{2023}\x{2043}\x{2219}\x{25AA}\x{25AB}\x{25CB}\x{25CF}\x{25E6}\x{25C6}\x{25C7}\x{25BA}\x{25B8}\x{00B7}\x{E000}-\x{F8FF}][\s\x{00A0}]+`)
+
+// exoticSpaces are Unicode whitespace codepoints that look identical to ASCII
+// space but tokenize as separate (rarer) tokens for LLMs.
+var exoticSpaces = map[rune]bool{
+	'\u00A0': true, '\u1680': true, '\u2000': true, '\u2001': true,
+	'\u2002': true, '\u2003': true, '\u2004': true, '\u2005': true,
+	'\u2006': true, '\u2007': true, '\u2008': true, '\u2009': true,
+	'\u200A': true, '\u202F': true, '\u205F': true, '\u3000': true,
+}
+
+// invisibleZW are zero-width / BOM codepoints worth dropping; they render
+// identically to nothing but cost tokens.
+var invisibleZW = map[rune]bool{
+	'\u200B': true, '\u200C': true, '\uFEFF': true,
+}
+
+// normalizeSpaces folds exotic whitespace to ASCII space and drops invisibles.
+func normalizeSpaces(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case exoticSpaces[r]:
+			return ' '
+		case invisibleZW[r]:
+			return -1 // drop
+		}
+		return r
+	}, s)
+}
+
+// normalize trims trailing whitespace per line, normalizes exotic spaces and
+// bullet glyphs to their ASCII equivalents (skipping fenced code blocks),
+// collapses 3+ blank lines into one, and strips leading/trailing whitespace.
 func normalize(s string) string {
 	lines := strings.Split(s, "\n")
+	inCode := false
 	for i, ln := range lines {
-		lines[i] = strings.TrimRight(ln, " \t\r")
+		ln = strings.TrimRight(ln, " \t\r")
+		if strings.HasPrefix(strings.TrimSpace(ln), "```") {
+			inCode = !inCode
+			lines[i] = ln
+			continue
+		}
+		if !inCode {
+			ln = normalizeSpaces(ln)
+			ln = bulletPrefix.ReplaceAllString(ln, "$1- ")
+		}
+		lines[i] = ln
 	}
 	joined := strings.Join(lines, "\n")
-	return strings.TrimSpace(blankLines.ReplaceAllString(joined, "\n\n"))
+	joined = blankLines.ReplaceAllString(joined, "\n\n")
+	return stripBlankLines(joined)
+}
+
+// stripBlankLines removes leading and trailing empty/whitespace-only lines but
+// preserves the content lines' own indentation (so nested bullets stay nested).
+func stripBlankLines(s string) string {
+	lines := strings.Split(s, "\n")
+	start, end := 0, len(lines)
+	for start < end && strings.TrimSpace(lines[start]) == "" {
+		start++
+	}
+	for end > start && strings.TrimSpace(lines[end-1]) == "" {
+		end--
+	}
+	return strings.Join(lines[start:end], "\n")
 }
