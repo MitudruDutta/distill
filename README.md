@@ -12,6 +12,13 @@ pipelines. No interpreter, no heavy runtime — just one binary.
 go build -o distill ./cmd/distill
 ```
 
+For a higher-fidelity PDF text engine, build with the optional PDFium backend
+(pure-Go WebAssembly, no cgo — larger binary):
+
+```bash
+go build -tags pdfium -o distill ./cmd/distill
+```
+
 ## Usage
 
 ```bash

@@ -32,6 +32,7 @@ func Default() *convert.Registry {
 	reg.Register(EML{}, 0)
 	reg.Register(EPUB{}, 0)
 	reg.Register(PDF{}, 0)
+	registerPDFium(reg) // adds PDFium ahead of PDF when built with -tags pdfium
 	reg.Register(Archive{Reg: reg}, 0)
 
 	return reg
