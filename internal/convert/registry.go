@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 // Converter turns a document stream into Markdown.
@@ -100,6 +101,44 @@ var invisibleZW = map[rune]bool{
 	'\u200B': true, '\u200C': true, '\uFEFF': true,
 }
 
+// longLineThreshold is the character count beyond which we try to break a line
+// at sentence boundaries. Most real-world paragraphs are well under this, but
+// some sources (HTML/EPUB with one giant <p>, ipynb cells, etc.) emit
+// thousand-character lines that are useless for LLM chunking.
+const longLineThreshold = 800
+
+// wrapLongLine splits an overly long line at sentence boundaries (". " / "! "
+// / "? " followed by an uppercase letter). It only fires above the threshold,
+// keeps each chunk substantial, and is a no-op when no clean split exists.
+func wrapLongLine(line string) string {
+	if len(line) <= longLineThreshold {
+		return line
+	}
+	const minChunk = 200
+	runes := []rune(line)
+	var out []string
+	var cur strings.Builder
+	for i := 0; i < len(runes); i++ {
+		cur.WriteRune(runes[i])
+		if cur.Len() < minChunk || i+2 >= len(runes) {
+			continue
+		}
+		r := runes[i]
+		if (r == '.' || r == '!' || r == '?') && runes[i+1] == ' ' && unicode.IsUpper(runes[i+2]) {
+			out = append(out, cur.String())
+			cur.Reset()
+			i++ // skip the space
+		}
+	}
+	if cur.Len() > 0 {
+		out = append(out, strings.TrimSpace(cur.String()))
+	}
+	if len(out) <= 1 {
+		return line
+	}
+	return strings.Join(out, "\n")
+}
+
 // normalizeSpaces folds exotic whitespace to ASCII space and drops invisibles.
 func normalizeSpaces(s string) string {
 	return strings.Map(func(r rune) rune {
@@ -129,6 +168,7 @@ func normalize(s string) string {
 		if !inCode {
 			ln = normalizeSpaces(ln)
 			ln = bulletPrefix.ReplaceAllString(ln, "$1- ")
+			ln = wrapLongLine(ln)
 		}
 		lines[i] = ln
 	}

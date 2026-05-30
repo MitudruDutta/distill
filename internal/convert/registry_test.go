@@ -75,6 +75,29 @@ func TestNormalizePreservesContentInCodeFences(t *testing.T) {
 	}
 }
 
+func TestNormalizeWrapsImplausiblyLongLineAtSentenceBoundaries(t *testing.T) {
+	sentence := "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. "
+	in := strings.Repeat(sentence, 20) // ~2300 chars, way over threshold
+	got := normalize(in)
+	lines := strings.Split(got, "\n")
+	if len(lines) < 4 {
+		t.Fatalf("expected the long line to be split into multiple lines, got %d:\n%s", len(lines), got)
+	}
+	for _, ln := range lines {
+		if len(ln) > longLineThreshold+200 {
+			t.Fatalf("line still too long (%d chars): %q", len(ln), ln)
+		}
+	}
+}
+
+func TestNormalizeShortLinesUntouched(t *testing.T) {
+	// Lines under the threshold must not be touched even if they end with ". A...".
+	in := "Hello world. And then we did things. The end."
+	if got := normalize(in); got != in {
+		t.Fatalf("short line was modified:\n got: %q\nwant: %q", got, in)
+	}
+}
+
 func TestConvertPrefersLowerPriority(t *testing.T) {
 	reg := &Registry{}
 	reg.Register(fakeConv{accept: true, out: "generic"}, 10)
