@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	gopdfium "github.com/klippa-app/go-pdfium"
 	"github.com/klippa-app/go-pdfium/requests"
@@ -20,9 +22,10 @@ import (
 )
 
 // PDFium extracts text using the bundled PDFium engine compiled to WebAssembly
-// (pure-Go via wazero; no cgo). It reconstructs Markdown tables from column
-// layout. Built with -tags pdfium it registers ahead of the default PDF
-// converter and falls through to it on error/empty.
+// (pure-Go via wazero; no cgo). It detects headings via font size, bullets via
+// leading whitespace, and reconstructs Markdown tables from column layout.
+// Built with -tags pdfium it registers ahead of the default PDF converter and
+// falls through to it on error/empty.
 type PDFium struct{}
 
 func registerPDFium(reg *convert.Registry) { reg.Register(PDFium{}, -1) }
@@ -75,8 +78,9 @@ func (PDFium) Convert(r io.Reader, _ convert.StreamInfo) (convert.Result, error)
 		page := requests.Page{ByIndex: &requests.PageByIndex{Document: doc.Document, Index: i}}
 		var pageMD string
 		if st, e := inst.GetPageTextStructured(&requests.GetPageTextStructured{
-			Page: page,
-			Mode: requests.GetPageTextStructuredModeRects,
+			Page:                   page,
+			Mode:                   requests.GetPageTextStructuredModeRects,
+			CollectFontInformation: true,
 		}); e == nil {
 			pageMD = reconstructPage(st.Rects)
 		}
@@ -98,23 +102,39 @@ func (PDFium) Convert(r io.Reader, _ convert.StreamInfo) (convert.Result, error)
 	return convert.Result{Markdown: b.String()}, nil
 }
 
-// reconstructPage groups text rects into rows (by vertical position) and columns
-// (by left position). If the page is predominantly multi-column it is rendered
-// as a Markdown table; otherwise as plain reading-order text.
+// pdfBox holds one PDFium text rect plus the metadata needed for layout heuristics.
+type pdfBox struct {
+	text          string  // trimmed
+	raw           string  // original (preserves leading space → bullet marker)
+	left, top, bot float64
+	height        float64
+	fontSize      float64
+}
+
+// reconstructPage groups text rects into rows (Y) and decides whether the page
+// is a table (rendered as Markdown table) or prose. For prose it emits headings
+// via font-size ratio and bullets via leading whitespace.
 func reconstructPage(rects []*responses.GetPageTextStructuredRect) string {
-	type box struct {
-		text      string
-		left, top float64
-		height    float64
-	}
-	var boxes []box
+	var boxes []pdfBox
 	for _, r := range rects {
 		s := strings.TrimSpace(r.Text)
 		if s == "" {
 			continue
 		}
 		p := r.PointPosition
-		boxes = append(boxes, box{s, p.Left, p.Top, p.Top - p.Bottom})
+		size := 0.0
+		if r.FontInformation != nil {
+			size = r.FontInformation.Size
+		}
+		boxes = append(boxes, pdfBox{
+			text:     s,
+			raw:      r.Text,
+			left:     p.Left,
+			top:      p.Top,
+			bot:      p.Bottom,
+			height:   p.Top - p.Bottom,
+			fontSize: size,
+		})
 	}
 	if len(boxes) == 0 {
 		return ""
@@ -135,12 +155,11 @@ func reconstructPage(rects []*responses.GetPageTextStructuredRect) string {
 		colTol = 6
 	}
 
-	// Rows: top-to-bottom (PDF y increases upward), grouped by top proximity.
 	sort.Slice(boxes, func(i, j int) bool { return boxes[i].top > boxes[j].top })
-	var rows [][]box
+	var rows [][]pdfBox
 	for _, b := range boxes {
 		if len(rows) == 0 || rows[len(rows)-1][0].top-b.top > rowTol {
-			rows = append(rows, []box{b})
+			rows = append(rows, []pdfBox{b})
 		} else {
 			rows[len(rows)-1] = append(rows[len(rows)-1], b)
 		}
@@ -149,17 +168,7 @@ func reconstructPage(rects []*responses.GetPageTextStructuredRect) string {
 		sort.Slice(row, func(i, j int) bool { return row[i].left < row[j].left })
 	}
 
-	asText := func() string {
-		lines := make([]string, len(rows))
-		for ri, row := range rows {
-			parts := make([]string, len(row))
-			for i, b := range row {
-				parts[i] = b.text
-			}
-			lines[ri] = strings.Join(parts, " ")
-		}
-		return strings.Join(lines, "\n")
-	}
+	asText := func() string { return renderProse(rows, boxes) }
 
 	// Candidate columns from clustered left positions.
 	lefts := make([]float64, len(boxes))
@@ -184,8 +193,6 @@ func reconstructPage(rects []*responses.GetPageTextStructuredRect) string {
 	}
 
 	// A real table has FEW columns whose x-positions recur across MANY rows.
-	// Keep only columns supported by >=50% of rows (and >=3 rows); this rejects
-	// prose/resumes that merely scatter text across horizontal positions.
 	support := make([]int, len(cols))
 	for _, row := range rows {
 		seen := map[int]bool{}
@@ -211,7 +218,6 @@ func reconstructPage(rects []*responses.GetPageTextStructuredRect) string {
 	if len(strong) < 2 || len(strong) > 6 || len(rows) < 3 {
 		return asText()
 	}
-
 	multi := 0
 	for _, row := range rows {
 		seen := map[int]bool{}
@@ -242,4 +248,105 @@ func reconstructPage(rects []*responses.GetPageTextStructuredRect) string {
 		grid[ri] = cells
 	}
 	return strings.TrimRight(toMarkdownTable(grid), "\n")
+}
+
+// renderProse converts non-table rows into LLM-friendly Markdown: headings via
+// font-size ratio, bullets via leading whitespace.
+func renderProse(rows [][]pdfBox, boxes []pdfBox) string {
+	// Median font size across all boxes (used to detect oversized = heading).
+	var sizes []float64
+	for _, b := range boxes {
+		if b.fontSize > 0 {
+			sizes = append(sizes, b.fontSize)
+		}
+	}
+	var medFont float64
+	if len(sizes) > 0 {
+		sort.Float64s(sizes)
+		medFont = sizes[len(sizes)/2]
+	}
+
+	var out []string
+	blank := func() {
+		if len(out) > 0 && out[len(out)-1] != "" {
+			out = append(out, "")
+		}
+	}
+
+	for _, row := range rows {
+		parts := make([]string, len(row))
+		for i, b := range row {
+			parts[i] = b.text
+		}
+		text := strings.Join(parts, " ")
+
+		// Bullet: detect either leading whitespace in raw text (pdftotext-style)
+		// OR a bullet glyph as the first rune of any rect (PDFs commonly render
+		// • via a private-use codepoint specific to the document's font).
+		isBullet := false
+		if r := row[0].raw; len(r) > 0 && (r[0] == ' ' || r[0] == '\t') {
+			isBullet = true
+		}
+		if !isBullet {
+			for _, b := range row {
+				if first, _ := utf8.DecodeRuneInString(b.text); isBulletGlyph(first) {
+					isBullet = true
+					break
+				}
+			}
+		}
+
+		// Heading: largest font in the row, scaled against page median.
+		rowSize := 0.0
+		for _, b := range row {
+			if b.fontSize > rowSize {
+				rowSize = b.fontSize
+			}
+		}
+		ratio := 0.0
+		if medFont > 0 && rowSize > 0 {
+			ratio = rowSize / medFont
+		}
+
+		switch {
+		case ratio >= 1.5:
+			blank()
+			out = append(out, "# "+text)
+			out = append(out, "")
+		case ratio >= 1.25:
+			blank()
+			out = append(out, "## "+text)
+			out = append(out, "")
+		case ratio >= 1.12:
+			blank()
+			out = append(out, "### "+text)
+			out = append(out, "")
+		case isBullet:
+			out = append(out, "- "+stripBulletPrefix(text))
+		default:
+			out = append(out, text)
+		}
+	}
+	return strings.TrimSpace(strings.Join(out, "\n"))
+}
+
+// isBulletGlyph reports whether r is a codepoint commonly used as a bullet
+// marker in PDFs. The Private Use Area (U+E000–U+F8FF) is treated as a bullet
+// because most fonts use those codepoints for custom symbols, and resume/CV
+// PDFs use them for bullets specifically.
+func isBulletGlyph(r rune) bool {
+	switch r {
+	case '\u2022', '\u2023', '\u2043', '\u2219', // • ‣ ⁃ ∙
+		'\u25AA', '\u25AB', '\u25CB', '\u25CF', '\u25E6', // ▪ ▫ ○ ● ◦
+		'\u25C6', '\u25C7', '\u25BA', '\u25B8', '\u00B7': // ◆ ◇ ► ▸ ·
+		return true
+	}
+	return r >= 0xE000 && r <= 0xF8FF
+}
+
+// stripBulletPrefix removes any leading whitespace and bullet glyphs.
+func stripBulletPrefix(s string) string {
+	return strings.TrimLeftFunc(s, func(r rune) bool {
+		return unicode.IsSpace(r) || isBulletGlyph(r)
+	})
 }
