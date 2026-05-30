@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Go ${{ matrix.go }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.25"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+
+      - name: go vet (default)
+        run: go vet ./...
+
+      - name: go vet (-tags pdfium)
+        run: go vet -tags pdfium ./...
+
+      - name: go build (default)
+        run: go build ./...
+
+      - name: go build (-tags pdfium)
+        run: go build -tags pdfium ./...
+
+      - name: go test -race (default)
+        run: go test ./... -race -count=1
+
+      - name: go test (-tags pdfium)
+        run: go test -tags pdfium ./... -count=1
+
+      - name: Coverage (converters via black-box tests)
+        run: go test ./internal/converters/tests/ -coverpkg=./internal/converters/src -count=1

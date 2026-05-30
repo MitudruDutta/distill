@@ -1,0 +1,10 @@
+.git
+.github
+.idea
+.vscode
+*.md
+!go.mod
+!go.sum
+distill
+dist/
+testdata-tmp/

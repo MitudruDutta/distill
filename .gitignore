@@ -13,3 +13,10 @@ go.work.sum
 .DS_Store
 .idea/
 .vscode/
+
+# GoReleaser output
+/dist/
+
+# Private project docs (kept locally only)
+/PRD.md
+/TASKS.md

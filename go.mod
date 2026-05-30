@@ -1,6 +1,6 @@
 module github.com/MitudruDutta/distill
 
-go 1.26
+go 1.25.0
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.1
@@ -8,7 +8,7 @@ require (
 	github.com/klippa-app/go-pdfium v1.19.3
 	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/xuri/excelize/v2 v2.10.1
-	golang.org/x/image v0.25.0
+	golang.org/x/image v0.41.0
 )
 
 require (
