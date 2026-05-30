@@ -23,6 +23,11 @@ func Default() *convert.Registry {
 	reg.Register(JSON{}, 0)
 	reg.Register(Ipynb{}, 0)
 	reg.Register(Feed{}, 0)
+	reg.Register(DOCX{}, 0)
+	reg.Register(PPTX{}, 0)
+	reg.Register(ODF{}, 0)
+	reg.Register(XLSX{}, 0)
+	reg.Register(Image{}, 0)
 
 	return reg
 }
