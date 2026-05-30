@@ -36,5 +36,27 @@ func (f Fenced) Convert(r io.Reader, _ convert.StreamInfo) (convert.Result, erro
 		return convert.Result{}, err
 	}
 	content := strings.TrimRight(string(b), "\n")
-	return convert.Result{Markdown: "```" + f.Lang + "\n" + content + "\n```"}, nil
+	fence := fenceFor(content)
+	return convert.Result{Markdown: fence + f.Lang + "\n" + content + "\n" + fence}, nil
+}
+
+// fenceFor returns a backtick fence (>=3) long enough to wrap content that may
+// itself contain runs of backticks.
+func fenceFor(content string) string {
+	longest, run := 0, 0
+	for _, r := range content {
+		if r == '`' {
+			run++
+			if run > longest {
+				longest = run
+			}
+		} else {
+			run = 0
+		}
+	}
+	n := 3
+	if longest+1 > n {
+		n = longest + 1
+	}
+	return strings.Repeat("`", n)
 }

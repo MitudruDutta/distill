@@ -13,25 +13,30 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	if err := run(os.Args[1:], os.Stdin, os.Stdout); err != nil {
 		fmt.Fprintln(os.Stderr, "distill:", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
-	out := flag.String("o", "", "output file (default: stdout)")
-	ext := flag.String("x", "", "extension hint, e.g. csv (useful for stdin)")
-	mimeHint := flag.String("m", "", "MIME type hint")
-	charset := flag.String("c", "", "charset hint, e.g. utf-8")
-	flag.Parse()
+func run(args []string, stdin io.Reader, stdout io.Writer) error {
+	fs := flag.NewFlagSet("distill", flag.ContinueOnError)
+	out := fs.String("o", "", "output file (default: stdout)")
+	ext := fs.String("x", "", "extension hint, e.g. csv (useful for stdin)")
+	mimeHint := fs.String("m", "", "MIME type hint")
+	charset := fs.String("c", "", "charset hint, e.g. utf-8")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
 
-	// Allow flags to appear after the filename (e.g. `distill file.csv -o out.md`),
-	// which the stdlib flag package does not handle by default.
+	// Allow flags to appear after the filename (e.g. `distill file.csv -o out.md`);
+	// the flag package stops at the first positional argument otherwise.
 	var files []string
-	for rest := flag.Args(); len(rest) > 0; rest = flag.Args() {
+	for rest := fs.Args(); len(rest) > 0; rest = fs.Args() {
 		files = append(files, rest[0])
-		flag.CommandLine.Parse(rest[1:])
+		if err := fs.Parse(rest[1:]); err != nil {
+			return err
+		}
 	}
 
 	base := convert.StreamInfo{Mimetype: *mimeHint, Charset: *charset}
@@ -43,7 +48,7 @@ func run() error {
 		base.Extension = e
 	}
 
-	var r io.Reader = os.Stdin
+	r := stdin
 	if len(files) > 0 {
 		f, err := os.Open(files[0])
 		if err != nil {
@@ -61,7 +66,6 @@ func run() error {
 	if err != nil {
 		return err
 	}
-
 	peek := data
 	if len(peek) > 512 {
 		peek = peek[:512]
@@ -70,10 +74,9 @@ func run() error {
 	if err != nil {
 		return err
 	}
-
 	if *out != "" {
 		return os.WriteFile(*out, []byte(res.Markdown+"\n"), 0o644)
 	}
-	fmt.Println(res.Markdown)
-	return nil
+	_, err = fmt.Fprintln(stdout, res.Markdown)
+	return err
 }

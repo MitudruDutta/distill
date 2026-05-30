@@ -32,6 +32,10 @@ func (CSV) Convert(r io.Reader, info convert.StreamInfo) (convert.Result, error)
 	return convert.Result{Markdown: toMarkdownTable(rows)}, nil
 }
 
+// cellReplacer makes a value safe for a single Markdown table cell: a raw
+// newline would break the row, so it becomes <br>; pipes are escaped.
+var cellReplacer = strings.NewReplacer("\r\n", "<br>", "\r", "<br>", "\n", "<br>", "|", "\\|")
+
 // toMarkdownTable renders rows as a GitHub-flavored Markdown table. The first
 // row is treated as the header.
 func toMarkdownTable(rows [][]string) string {
@@ -51,7 +55,7 @@ func toMarkdownTable(rows [][]string) string {
 		for c := 0; c < cols; c++ {
 			cell := ""
 			if c < len(cells) {
-				cell = strings.ReplaceAll(cells[c], "|", "\\|")
+				cell = cellReplacer.Replace(cells[c])
 			}
 			b.WriteByte(' ')
 			b.WriteString(cell)
