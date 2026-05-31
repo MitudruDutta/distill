@@ -38,7 +38,33 @@ var (
 	// child process keeps the stdout/stderr pipes open (e.g. a plugin that
 	// forks). Without this, a forking plugin hangs distill past its timeout.
 	ioGrace = 2 * time.Second
+	// maxOutputBytes caps a plugin's stdout so a runaway/malicious plugin
+	// cannot OOM distill. Generous, but bounded.
+	maxOutputBytes = 256 << 20 // 256 MiB
 )
+
+var errOutputTooLarge = errors.New("plugin output exceeded limit")
+
+// capWriter buffers writes up to limit bytes; once exceeded it records overflow,
+// cancels the conversion context (killing the child so it can't block on a full
+// pipe), and rejects further writes.
+type capWriter struct {
+	buf      bytes.Buffer
+	limit    int
+	overflow bool
+	cancel   context.CancelFunc
+}
+
+func (w *capWriter) Write(p []byte) (int, error) {
+	if w.overflow || w.buf.Len()+len(p) > w.limit {
+		if !w.overflow && w.cancel != nil {
+			w.cancel()
+		}
+		w.overflow = true
+		return 0, errOutputTooLarge
+	}
+	return w.buf.Write(p)
+}
 
 // Manifest is one entry in a plugins.json config file.
 type Manifest struct {
@@ -155,10 +181,14 @@ func (p Plugin) Convert(data []byte) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, p.Manifest.Command, p.Manifest.Args...)
 	cmd.WaitDelay = ioGrace
 	cmd.Stdin = bytes.NewReader(data)
-	var out, errb bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &out, &errb
+	out := &capWriter{limit: maxOutputBytes, cancel: cancel}
+	var errb bytes.Buffer
+	cmd.Stdout, cmd.Stderr = out, &errb
 	if err := cmd.Run(); err != nil {
+		if out.overflow {
+			return nil, fmt.Errorf("plugin %s: %w (limit %d bytes)", p.Capabilities.Name, errOutputTooLarge, maxOutputBytes)
+		}
 		return nil, fmt.Errorf("plugin %s: %w: %s", p.Capabilities.Name, err, strings.TrimSpace(errb.String()))
 	}
-	return out.Bytes(), nil
+	return out.buf.Bytes(), nil
 }
