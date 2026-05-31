@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -62,5 +63,76 @@ func TestRunBatchSubcommand(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(out, "a.md")); err != nil {
 		t.Fatalf("output missing: %v", err)
+	}
+}
+
+
+// setupPluginWorkspace chdir's into a temp dir holding a .distill/plugins.json
+// that points at an executable upcasing plugin, plus a sample .up file.
+func setupPluginWorkspace(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("shell-script plugins are POSIX-only in tests")
+	}
+	dir := t.TempDir()
+	t.Chdir(dir)
+	script := filepath.Join(dir, "up.sh")
+	body := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"--distill-capabilities\" ]; then\n" +
+		"  echo '{\"name\":\"upcase\",\"version\":\"0.1.0\",\"extensions\":[\".up\"]}'\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"printf '# upcased\\n\\n'\n" +
+		"tr '[:lower:]' '[:upper:]'\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(".distill", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `{"plugins":[{"name":"upcase","command":"` + script + `"}]}`
+	if err := os.WriteFile(filepath.Join(".distill", "plugins.json"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("sample.up", []byte("hello world\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRunListPluginsShowsConfigured(t *testing.T) {
+	setupPluginWorkspace(t)
+	var out bytes.Buffer
+	if err := run([]string{"--list-plugins"}, nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "upcase") || !strings.Contains(out.String(), ".up") {
+		t.Fatalf("list output: %q", out.String())
+	}
+}
+
+func TestRunUsePluginsConvertsViaPlugin(t *testing.T) {
+	setupPluginWorkspace(t)
+	var out bytes.Buffer
+	if err := run([]string{"--use-plugins", "sample.up"}, nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "# upcased") || !strings.Contains(out.String(), "HELLO WORLD") {
+		t.Fatalf("plugin output: %q", out.String())
+	}
+}
+
+func TestRunWithoutUsePluginsIgnoresPlugin(t *testing.T) {
+	setupPluginWorkspace(t)
+	t.Setenv("DISTILL_USE_PLUGINS", "") // ensure env doesn't enable it
+	var out bytes.Buffer
+	if err := run([]string{"sample.up"}, nil, &out); err != nil {
+		t.Fatal(err)
+	}
+	// Plain-text catch-all leaves content untouched (not upcased).
+	if strings.Contains(out.String(), "HELLO WORLD") || strings.Contains(out.String(), "# upcased") {
+		t.Fatalf("plugin should be OFF by default, got: %q", out.String())
+	}
+	if !strings.Contains(out.String(), "hello world") {
+		t.Fatalf("expected plain passthrough, got: %q", out.String())
 	}
 }

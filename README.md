@@ -166,6 +166,7 @@ distill stays self-contained. If these tools are present on `PATH`, additional f
 | MCP server protocol & client setup | [`docs/mcp.md`](docs/mcp.md) |
 | **Agent integration patterns** (auto-convert before LLM) | [`docs/agents.md`](docs/agents.md) |
 | HTTP API contract | [`docs/serve.md`](docs/serve.md) |
+| **Plugin protocol** (add a format without recompiling) | [`docs/plugins.md`](docs/plugins.md) |
 | Threat model & hardening | [`docs/security.md`](docs/security.md) |
 | Architecture & adding a converter | [`docs/development.md`](docs/development.md) |
 

@@ -13,6 +13,7 @@ import (
 	"github.com/MitudruDutta/distill/internal/app"
 	"github.com/MitudruDutta/distill/internal/convert"
 	converters "github.com/MitudruDutta/distill/internal/converters/src"
+	"github.com/MitudruDutta/distill/internal/plugin"
 )
 
 func main() {
@@ -30,10 +31,52 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		case "serve":
 			return runServe(args[1:], stdout)
 		case "mcp":
-			return app.MCP(converters.Default(), stdin, stdout)
+			return app.MCP(registryWithPlugins(envPlugins()), stdin, stdout)
 		}
 	}
 	return runConvert(args, stdin, stdout)
+}
+
+// envPlugins reports whether DISTILL_USE_PLUGINS is set (non-empty).
+func envPlugins() bool { return os.Getenv("DISTILL_USE_PLUGINS") != "" }
+
+// registryWithPlugins returns the default registry; when enable is true it also
+// loads, discovers, and registers configured plugins (ahead of built-ins).
+// Plugin discovery problems are reported to stderr and are non-fatal.
+func registryWithPlugins(enable bool) *convert.Registry {
+	reg := converters.Default()
+	if !enable {
+		return reg
+	}
+	_, derrs, err := converters.RegisterPlugins(reg)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "distill: plugin config:", err)
+	}
+	for _, e := range derrs {
+		fmt.Fprintln(os.Stderr, "distill: plugin:", e)
+	}
+	return reg
+}
+
+// listConfiguredPlugins prints discovered plugins (and discovery failures).
+func listConfiguredPlugins(stdout io.Writer) error {
+	manifests, err := plugin.LoadManifests()
+	if err != nil {
+		return err
+	}
+	if len(manifests) == 0 {
+		fmt.Fprintln(stdout, "No plugins configured. See docs/plugins.md to add one.")
+		return nil
+	}
+	plugins, errs := plugin.Discover(manifests)
+	for _, p := range plugins {
+		formats := append(append([]string{}, p.Capabilities.Extensions...), p.Capabilities.Mimetypes...)
+		fmt.Fprintf(stdout, "%-20s %-10s %s\n", p.Capabilities.Name, p.Capabilities.Version, strings.Join(formats, " "))
+	}
+	for _, e := range errs {
+		fmt.Fprintln(stdout, "(unavailable)", e)
+	}
+	return nil
 }
 
 func runConvert(args []string, stdin io.Reader, stdout io.Writer) error {
@@ -45,8 +88,13 @@ func runConvert(args []string, stdin io.Reader, stdout io.Writer) error {
 	asJSON := fs.Bool("json", false, "emit a JSON document model instead of Markdown")
 	userAgent := fs.String("user-agent", os.Getenv("DISTILL_USER_AGENT"),
 		"HTTP User-Agent for URL fetches (env: DISTILL_USER_AGENT)")
+	usePlugins := fs.Bool("use-plugins", envPlugins(), "enable third-party converter plugins (env: DISTILL_USE_PLUGINS)")
+	listPlugins := fs.Bool("list-plugins", false, "list configured plugins and exit")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *listPlugins {
+		return listConfiguredPlugins(stdout)
 	}
 	// Allow flags after the filename (the flag package stops at the first positional).
 	var files []string
@@ -97,7 +145,7 @@ func runConvert(args []string, stdin io.Reader, stdout io.Writer) error {
 	if len(peek) > 512 {
 		peek = peek[:512]
 	}
-	res, err := converters.Default().Convert(bytes.NewReader(data), convert.Guess(base, peek))
+	res, err := registryWithPlugins(*usePlugins).Convert(bytes.NewReader(data), convert.Guess(base, peek))
 	if err != nil {
 		return err
 	}
@@ -137,7 +185,7 @@ func runBatch(args []string, stdout io.Writer) error {
 		return errors.New("batch: --out-dir is required")
 	}
 
-	ok, bad, err := app.Batch(converters.Default(), app.BatchOptions{
+	ok, bad, err := app.Batch(registryWithPlugins(envPlugins()), app.BatchOptions{
 		InDir: dirs[0], OutDir: *outDir, JSON: *asJSON, Workers: *workers,
 	})
 	if err != nil {
@@ -155,7 +203,7 @@ func runServe(args []string, stdout io.Writer) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	srv, err := app.NewServer(converters.Default(), app.ServeOptions{Addr: *addr, Token: *token, MaxBytes: *maxBytes})
+	srv, err := app.NewServer(registryWithPlugins(envPlugins()), app.ServeOptions{Addr: *addr, Token: *token, MaxBytes: *maxBytes})
 	if err != nil {
 		return err
 	}

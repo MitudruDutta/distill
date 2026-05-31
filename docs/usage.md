@@ -28,6 +28,8 @@ distill report.docx -json -o out.json  # → JSON to file
 | `-m MIME` | MIME-type hint |
 | `-c CHARSET` | Charset hint (e.g. `utf-8`) |
 | `-json` | Emit a JSON document model instead of Markdown |
+| `--use-plugins` | Enable third-party converter plugins (env: `DISTILL_USE_PLUGINS`) |
+| `--list-plugins` | List configured plugins and exit |
 
 The flag parser accepts flags **before or after** the filename:
 `distill file.tsv -o out.md` and `distill -o out.md file.tsv` both work.
@@ -66,6 +68,20 @@ Some sites reject `distill/0.1` (Stack Overflow, certain CDNs). Override:
 distill --user-agent "Mozilla/5.0 …" https://stackoverflow.com/questions/tagged/go
 DISTILL_USER_AGENT="my-bot/1.0" distill https://example.com/
 ```
+
+## Plugins
+
+distill can hand unsupported formats to out-of-process plugins (any executable
+that speaks a small stdin/stdout protocol). Plugins are **off by default**.
+
+```bash
+distill --list-plugins              # show configured plugins
+distill --use-plugins report.rtf    # enable for this conversion
+DISTILL_USE_PLUGINS=1 distill x.rtf # enable via environment
+```
+
+Full protocol, manifest format, security model, and a worked example:
+[plugins.md](plugins.md).
 
 ## Batch mode
 
