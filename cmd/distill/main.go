@@ -43,6 +43,8 @@ func runConvert(args []string, stdin io.Reader, stdout io.Writer) error {
 	mimeHint := fs.String("m", "", "MIME type hint")
 	charset := fs.String("c", "", "charset hint, e.g. utf-8")
 	asJSON := fs.Bool("json", false, "emit a JSON document model instead of Markdown")
+	userAgent := fs.String("user-agent", os.Getenv("DISTILL_USER_AGENT"),
+		"HTTP User-Agent for URL fetches (env: DISTILL_USER_AGENT)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -67,7 +69,7 @@ func runConvert(args []string, stdin io.Reader, stdout io.Writer) error {
 	r := stdin
 	if len(files) > 0 {
 		if app.IsURI(files[0]) {
-			data, info, err := app.FetchURI(files[0], app.FetchOptions{})
+			data, info, err := app.FetchURI(files[0], app.FetchOptions{UserAgent: *userAgent})
 			if err != nil {
 				return err
 			}

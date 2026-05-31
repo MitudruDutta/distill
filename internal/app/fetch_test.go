@@ -38,6 +38,36 @@ func TestFetchHTTPHappyPathSetsMimeAndExtension(t *testing.T) {
 }
 
 func TestFetchHTTPHonorsContentDispositionFilename(t *testing.T) {
+
+func TestFetchHTTPSendsCustomUserAgent(t *testing.T) {
+	var seen string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = r.Header.Get("User-Agent")
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+	if _, _, err := FetchURI(srv.URL, FetchOptions{AllowLoopback: true, UserAgent: "test-agent/9.9"}); err != nil {
+		t.Fatal(err)
+	}
+	if seen != "test-agent/9.9" {
+		t.Fatalf("server saw User-Agent %q, want test-agent/9.9", seen)
+	}
+}
+
+func TestFetchHTTPDefaultUserAgentWhenUnset(t *testing.T) {
+	var seen string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = r.Header.Get("User-Agent")
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+	if _, _, err := FetchURI(srv.URL, FetchOptions{AllowLoopback: true}); err != nil {
+		t.Fatal(err)
+	}
+	if seen == "" {
+		t.Fatal("default User-Agent must be set")
+	}
+}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Disposition", `attachment; filename="report.pdf"`)

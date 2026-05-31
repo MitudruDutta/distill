@@ -58,6 +58,15 @@ so DNS rebinding cannot bypass it. Other defaults: 30-second total timeout,
 32 MiB body cap, 5 redirect hops max, redirect targets must use an allowed
 scheme.
 
+#### Custom User-Agent
+
+Some sites reject `distill/0.1` (Stack Overflow, certain CDNs). Override:
+
+```bash
+distill --user-agent "Mozilla/5.0 …" https://stackoverflow.com/questions/tagged/go
+DISTILL_USER_AGENT="my-bot/1.0" distill https://example.com/
+```
+
 ## Batch mode
 
 ```bash
