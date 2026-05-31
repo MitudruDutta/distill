@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFetchHTTPHappyPathSetsMimeAndExtension(t *testing.T) {
@@ -37,8 +38,6 @@ func TestFetchHTTPHappyPathSetsMimeAndExtension(t *testing.T) {
 	}
 }
 
-func TestFetchHTTPHonorsContentDispositionFilename(t *testing.T) {
-
 func TestFetchHTTPSendsCustomUserAgent(t *testing.T) {
 	var seen string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -68,6 +67,8 @@ func TestFetchHTTPDefaultUserAgentWhenUnset(t *testing.T) {
 		t.Fatal("default User-Agent must be set")
 	}
 }
+
+func TestFetchHTTPHonorsContentDispositionFilename(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		w.Header().Set("Content-Disposition", `attachment; filename="report.pdf"`)
@@ -247,5 +248,115 @@ func TestIsURI(t *testing.T) {
 		if IsURI(s) {
 			t.Errorf("IsURI(%q) = true, want false", s)
 		}
+	}
+}
+
+
+// --- additional coverage: IPv6 SSRF, error paths, malformed inputs --------
+
+func TestFetchHTTPRefusesIPv6Loopback(t *testing.T) {
+	if _, _, err := FetchURI("http://[::1]/", FetchOptions{}); err == nil {
+		t.Fatal("expected SSRF refusal of IPv6 loopback ::1")
+	}
+}
+
+func TestFetchHTTPRefusesIPv6LinkLocal(t *testing.T) {
+	if _, _, err := FetchURI("http://[fe80::1]/", FetchOptions{}); err == nil {
+		t.Fatal("expected SSRF refusal of IPv6 link-local fe80::1")
+	}
+}
+
+func TestFetchHTTPRefusesIPv6PrivateULA(t *testing.T) {
+	// fc00::/7 is the IPv6 unique-local (private) range, RFC 4193.
+	if _, _, err := FetchURI("http://[fc00::1]/", FetchOptions{}); err == nil {
+		t.Fatal("expected SSRF refusal of IPv6 ULA fc00::1")
+	}
+}
+
+func TestFetchHTTPRefusesUnspecified(t *testing.T) {
+	if _, _, err := FetchURI("http://0.0.0.0/", FetchOptions{}); err == nil {
+		t.Fatal("expected SSRF refusal of 0.0.0.0")
+	}
+}
+
+func TestFetchHTTP404IsAnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+	_, _, err := FetchURI(srv.URL, FetchOptions{AllowLoopback: true})
+	if err == nil {
+		t.Fatal("expected 404 to surface as an error")
+	}
+	if !strings.Contains(err.Error(), "404") {
+		t.Errorf("error should mention 404: %v", err)
+	}
+}
+
+func TestFetchHTTP500IsAnError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	}))
+	defer srv.Close()
+	_, _, err := FetchURI(srv.URL, FetchOptions{AllowLoopback: true})
+	if err == nil {
+		t.Fatal("expected 500 to surface as an error")
+	}
+	if !strings.Contains(err.Error(), "500") {
+		t.Errorf("error should mention 500: %v", err)
+	}
+}
+
+func TestFetchHTTPRequestTimeout(t *testing.T) {
+	// Server that never responds within the test budget.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+	_, _, err := FetchURI(srv.URL, FetchOptions{
+		AllowLoopback: true,
+		Timeout:       50 * time.Millisecond,
+	})
+	if err == nil {
+		t.Fatal("expected timeout error")
+	}
+}
+
+func TestFetchDataURIMalformedNoComma(t *testing.T) {
+	if _, _, err := FetchURI("data:text/plain;base64nocomma", FetchOptions{}); err == nil {
+		t.Fatal("expected malformed-data-URI error (missing comma)")
+	}
+}
+
+func TestFetchDataURIBadBase64(t *testing.T) {
+	if _, _, err := FetchURI("data:text/plain;base64,@@@@not-base64@@@@", FetchOptions{}); err == nil {
+		t.Fatal("expected base64 decode error")
+	}
+}
+
+func TestFetchFileURINotFound(t *testing.T) {
+	if _, _, err := FetchURI("file:///definitely/does/not/exist/abc.xyz", FetchOptions{}); err == nil {
+		t.Fatal("expected file-not-found error")
+	}
+}
+
+func TestFetchHTTPInvalidURL(t *testing.T) {
+	if _, _, err := FetchURI("http://[bad-host:80/", FetchOptions{}); err == nil {
+		t.Fatal("expected URL parse error")
+	}
+}
+
+func TestFetchHTTPBodyCapSucceedsAtLimit(t *testing.T) {
+	// MaxBytes equals body size → must succeed (off-by-one regression guard).
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(make([]byte, 100))
+	}))
+	defer srv.Close()
+	data, _, err := FetchURI(srv.URL, FetchOptions{AllowLoopback: true, MaxBytes: 100})
+	if err != nil {
+		t.Fatalf("body exactly at MaxBytes should succeed, got: %v", err)
+	}
+	if len(data) != 100 {
+		t.Errorf("len(data) = %d, want 100", len(data))
 	}
 }
