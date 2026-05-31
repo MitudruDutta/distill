@@ -251,7 +251,6 @@ func TestIsURI(t *testing.T) {
 	}
 }
 
-
 // --- additional coverage: IPv6 SSRF, error paths, malformed inputs --------
 
 func TestFetchHTTPRefusesIPv6Loopback(t *testing.T) {
