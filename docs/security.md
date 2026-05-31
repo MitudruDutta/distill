@@ -53,9 +53,12 @@ trust boundaries are.
   any file your user has access to. Limit the agent's autonomy if this matters.
 - **No sandboxing of external tools.** `tesseract`, `whisper`, `ffmpeg`,
   `pdftotext` run as your user. Keep them updated.
-- **No URL fetching by default.** When/if you build that in, **must** include
-  SSRF blocking (private/loopback/link-local/cloud-metadata IPs) — the
-  scaffolding is in the PRD but not yet implemented.
+- **URL fetching is implemented and SSRF-guarded** (see "URL fetching" below).
+  Loopback, private (RFC 1918 / 4193), link-local (incl. cloud-metadata
+  169.254.169.254), multicast, and unspecified IPs are refused before
+  connect. The check runs after DNS resolution on every redirect hop, so
+  DNS rebinding cannot bypass it. Schemes are allowlisted (`http`, `https`,
+  `file`, `data`); body size, redirect count, and request timeout are capped.
 
 ## Reporting a vulnerability
 

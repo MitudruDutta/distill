@@ -32,6 +32,32 @@ distill report.docx -json -o out.json  # → JSON to file
 The flag parser accepts flags **before or after** the filename:
 `distill file.tsv -o out.md` and `distill -o out.md file.tsv` both work.
 
+### URL and URI inputs
+
+The same `distill FILE` form also accepts URIs as the first positional:
+
+```bash
+distill https://example.com/whitepaper.pdf
+distill http://example.com/data.csv -o data.md
+distill 'data:text/csv;base64,YSxiCjEsMgo='
+distill file:///etc/hosts
+```
+
+Supported schemes: `http`, `https`, `file`, `data`. Anything else is rejected.
+
+HTTP(S) fetches are **SSRF-guarded by default**. The fetcher refuses to connect
+to:
+
+- loopback (127.0.0.0/8, ::1),
+- RFC 1918 / RFC 4193 private ranges (10/8, 172.16/12, 192.168/16, fc00::/7),
+- link-local — including the cloud-metadata IP **169.254.169.254** (fe80::/10),
+- multicast and unspecified addresses.
+
+The check runs after DNS resolution and before connect, on every redirect hop,
+so DNS rebinding cannot bypass it. Other defaults: 30-second total timeout,
+32 MiB body cap, 5 redirect hops max, redirect targets must use an allowed
+scheme.
+
 ## Batch mode
 
 ```bash

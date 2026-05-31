@@ -76,6 +76,9 @@ distill report.docx                    # → Markdown to stdout
 distill report.docx -o report.md       # → write to a file
 cat data.csv | distill -x csv          # → stdin
 distill report.pdf -json               # → structured JSON model
+distill https://example.com/paper.pdf  # → fetch a URL (SSRF-safe by default)
+distill 'data:text/csv;base64,YSxiCjEsMgo='  # → data: URI
+distill file:///etc/hosts              # → file: URI
 ```
 
 Flags: `-o` output · `-x` extension hint · `-m` MIME hint · `-c` charset · `-json`. Full reference: [`docs/usage.md`](docs/usage.md).

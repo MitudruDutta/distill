@@ -66,15 +66,24 @@ func runConvert(args []string, stdin io.Reader, stdout io.Writer) error {
 
 	r := stdin
 	if len(files) > 0 {
-		f, err := os.Open(files[0])
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		r = f
-		base.Filename, base.LocalPath = files[0], files[0]
-		if base.Extension == "" {
-			base.Extension = convert.ExtensionOf(files[0])
+		if app.IsURI(files[0]) {
+			data, info, err := app.FetchURI(files[0], app.FetchOptions{})
+			if err != nil {
+				return err
+			}
+			r = bytes.NewReader(data)
+			base = base.Merge(info)
+		} else {
+			f, err := os.Open(files[0])
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			r = f
+			base.Filename, base.LocalPath = files[0], files[0]
+			if base.Extension == "" {
+				base.Extension = convert.ExtensionOf(files[0])
+			}
 		}
 	}
 
