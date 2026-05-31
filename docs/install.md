@@ -16,7 +16,7 @@ The script:
 - installs to `~/.local/bin/distill` (override with `DISTILL_PREFIX`),
 - falls back to `go install` if a release isn't available for your platform.
 
-Pin a version with `DISTILL_VERSION=v0.2.0`.
+Pin a version with `DISTILL_VERSION=v0.1.1`.
 
 ## With Go
 

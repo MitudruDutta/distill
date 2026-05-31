@@ -121,8 +121,8 @@ The engine's `normalize()` will automatically clean up bullet glyphs / spaces
 Tag a commit on `main`:
 
 ```bash
-git tag -a v0.2.0 -m "v0.2.0"
-git push origin v0.2.0
+git tag -a v0.1.1 -m "v0.1.1"
+git push origin v0.1.1
 ```
 
 The release workflow (`.github/workflows/release.yml`) runs GoReleaser to
