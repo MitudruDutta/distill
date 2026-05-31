@@ -66,7 +66,6 @@ func TestRunBatchSubcommand(t *testing.T) {
 	}
 }
 
-
 // setupPluginWorkspace chdir's into a temp dir holding a .distill/plugins.json
 // that points at an executable upcasing plugin, plus a sample .up file.
 func setupPluginWorkspace(t *testing.T) {
